@@ -1,0 +1,371 @@
+############## Note 1: Although we have tried to automate the whhole program, 
+#there are places where following specification have been used:#######
+
+########### 1. No. of items = 8
+########### 2. No. of task per respondent = 6
+########### 3. No. of items per task = 4
+
+############## Note 2: The program can be modified by few minor changes for any desired number of above specification###
+
+rm(list = ls())
+library(reshape)
+
+###################### functions to be used ###############################
+
+###################### Restructure ###############################
+Restructure <- function(df,v){
+  z <- melt(df, id=v)
+  y <- z[order(z$id),]
+  return(y)
+}
+
+###################### Rename ###############################
+
+rename <- function(df1,u1,v1){
+  oldnames=u1
+  newnames=v1
+  for(i in 1:length(u1))names(df1)[names(df1)==oldnames[i]]=newnames[i]
+  return(df1)
+}
+
+################## Loading maxdiff Chosen shown data #######################
+
+max.diff.design <- read.csv("max.diff.design.csv")
+shown <- read.csv("shown.csv")
+chosen <- read.csv("chosen.csv")
+
+Task.No <- max(max.diff.design$Set)
+Concept.No <- length(max.diff.design) - 2  # -2 bcoz first row is version and second is set
+
+################## Splitting best/worst/anchor shown #######################
+
+chosenb <- chosen[c("id", "respid", "versions","b1","b2","b3","b4","b5","b6")]
+chosenw <- chosen[c("id", "respid", "versions","w1","w2","w3","w4","w5","w6")]
+chosena <- chosen[c("id", "respid", "versions","a1","a2","a3","a4","a5","a6")]
+
+##################For 4 times best/worst we need to create below matrix#######
+
+db <- matrix(rep(1),nrow = dim(chosenb)[1],ncol = Concept.No)
+dw <- matrix(rep(1),nrow = dim(chosenw)[1],ncol = Concept.No)
+da <- matrix(rep(1),nrow = dim(chosena)[1],ncol = Concept.No)
+
+chosen_newb <- cbind(chosenb,db)
+chosen_neww <- cbind(chosenw,dw)
+chosen_newa <- cbind(chosena,da)
+
+################## Replicating best/worst/anchor row equal to no. of concept #####################
+
+cb <- Restructure(chosen_newb,c("id", "respid", "versions", "b1","b2","b3","b4","b5","b6"))
+cw <- Restructure(chosen_neww,c("id", "respid", "versions", "w1","w2","w3","w4","w5","w6"))
+ca <- Restructure(chosen_newa,c("id", "respid", "versions", "a1","a2","a3","a4","a5","a6"))
+
+##################Deleting value and variable columns #####################
+
+rb <- cb[c("id", "respid", "versions","b1","b2","b3","b4","b5","b6")]
+rw <- cw[c("id", "respid", "versions","w1","w2","w3","w4","w5","w6")]
+ra <- ca[c("id", "respid", "versions","a1","a2","a3","a4","a5","a6")]
+
+################## Creating best/worst/anchor single column for each ###########################
+
+hb <- Restructure(rb,c("id", "respid", "versions"))
+hw <- Restructure(rw,c("id", "respid", "versions"))
+ha <- Restructure(ra,c("id", "respid", "versions"))
+
+
+################## Splitting shown according to tasks ####################################
+
+shown1 <- shown[c("id", "respid", "versions","hidatta12_01", "hidatta22_01", "hidatta32_01", "hidatta42_01")]
+shown2 <- shown[c("id", "respid", "versions","hidatta12_02", "hidatta22_02", "hidatta32_02", "hidatta42_02")]
+shown3 <- shown[c("id", "respid", "versions","hidatta12_03", "hidatta22_03", "hidatta32_03", "hidatta42_03")]
+shown4 <- shown[c("id", "respid", "versions","hidatta12_04", "hidatta22_04", "hidatta32_04", "hidatta42_04")]
+shown5 <- shown[c("id", "respid", "versions","hidatta12_05", "hidatta22_05", "hidatta32_05", "hidatta42_05")]
+shown6 <- shown[c("id", "respid", "versions","hidatta12_06", "hidatta22_06", "hidatta32_06", "hidatta42_06")]
+
+################### Creating shown column for each task ###########################
+
+z1 <- Restructure(shown1,c("id", "respid", "versions"))
+z2 <- Restructure(shown2,c("id", "respid", "versions"))
+z3 <- Restructure(shown3,c("id", "respid", "versions"))
+z4 <- Restructure(shown4,c("id", "respid", "versions"))
+z5 <- Restructure(shown5,c("id", "respid", "versions"))
+z6 <- Restructure(shown6,c("id", "respid", "versions"))
+
+################### Renaming  #########################################
+
+hb <- rename(hb,c("variable","value"),c("bwa","chosen"))
+hw <- rename(hw,c("variable","value"),c("bwa","chosen"))
+ha <- rename(ha,c("variable","value"),c("bwa","chosen"))
+z1 <- rename(z1,"value","shown1")
+z2 <- rename(z2,"value","shown2")
+z3 <- rename(z3,"value","shown3")
+z4 <- rename(z4,"value","shown4")
+z5 <- rename(z5,"value","shown5")
+z6 <- rename(z6,"value","shown6")
+
+################ Combining shown column ####################################
+
+z <- cbind(z1[c("id", "respid", "versions","shown1")],
+           z2["shown2"],z3["shown3"],z4["shown4"],z5["shown5"],z6["shown6"])
+
+################ Creating Single shown column ####################################
+
+c <- Restructure(z,c("id", "respid", "versions"))
+c <- rename(c,"value","shown")
+
+##################### Creating o/1 (Best choices) matrix ######################
+
+scb <- cbind(c[c("id", "respid", "versions","shown")],
+             hb[c("bwa","chosen")])
+
+mb <- matrix(, nrow = dim(c)[1], ncol = max(c$shown))
+
+for(i in 1:dim(scb)[1]){
+  for(j in 1:max(scb$shown))
+    if(scb$shown[i] == j)  {
+      mb[i,j] = 1
+    }
+  else{
+    mb[i,j] = 0
+  }
+}
+
+dual.resp.b <- cbind(scb,mb)
+
+
+sb <- vector("integer", dim(dual.resp.b)[1])
+
+for(i in 1:Concept.No){
+  sb[i] <- 1
+}
+
+for(i in 5:dim(dual.resp.b)[1]){
+  sb[i] <- sb[i-Concept.No] + 2
+}
+
+dual.resp.b$s <- sb
+
+dual.resp.b$pm <- c(rep('p',dim(dual.resp.b)[1]))
+
+#################### Renaming chosen column to anchor for anchor data ##############
+
+ha <- rename(ha,"chosen","anchor")
+
+#################### Adding anchor column in best data ######################################
+
+dual.resp.ba <- cbind(dual.resp.b, ha["anchor"])
+
+##################### Creating o/-1 (Worst choices) matrix ######################
+
+scw <- cbind(c[c("id", "respid", "versions","shown")],
+             hw[c("bwa","chosen")])
+
+mw <- matrix(, nrow = dim(c)[1], ncol = max(c$shown))
+
+for(i in 1:dim(scw)[1]){
+  for(j in 1:max(scw$shown))
+    if(scw$shown[i] == j)  {
+      mw[i,j] = -1
+    }
+  else{
+    mw[i,j] = 0
+  }
+}
+
+dual.resp.w <- cbind(scw,mw)
+
+sw <- vector("integer", dim(dual.resp.w)[1])
+
+for(i in 1:Concept.No){
+  sw[i] <- 2
+}
+
+for(i in (Concept.No + 1):dim(dual.resp.w)[1]){
+  sw[i] <- sw[i-Concept.No] + 2
+}
+
+dual.resp.w$s <- sw
+
+dual.resp.w$pm <- c(rep('m',dim(dual.resp.w)[1]))
+
+#################### Adding anchor column to worst data ######################################
+
+dual.resp.wa <- cbind(dual.resp.w, ha["anchor"])
+
+##################### Combining Best / Worst matrix ######################
+
+dual.resp.bwa <- rbind(dual.resp.ba,dual.resp.wa)
+
+dual.resp.s <- dual.resp.bwa[order(dual.resp.bwa$s),]
+
+write.csv(dual.resp.s, "dual.resp.s.csv", row.names = F)
+
+##################### Adding task and concept ######################
+
+dual.resp.s$task <- rep(1,dim(dual.resp.s)[1])
+
+for(i in (Concept.No + 1):(2*Task.No*Concept.No)){
+  dual.resp.s$task[i] <- dual.resp.s$task[i-Concept.No] + 1
+}
+
+for(i in (2*Task.No*Concept.No + 1):dim(dual.resp.s)[1]){
+  dual.resp.s$task[i] <- dual.resp.s$task[i-(2*Task.No*Concept.No)]
+}
+
+dual.resp.s$concept <- seq(from = 1,to = 4,by = 1)
+
+################### Renaming #########################################
+
+dual.resp.s <- rename(dual.resp.s,c("1","2","3","4","5","6","7","8"), 
+                    c("Att1","Att2","Att3","Att4","Att5","Att6","Att7","Att8"))
+
+dual.resp.with.anc <- dual.resp.s[c("respid","task","concept","Att1","Att2","Att3","Att4","Att5",
+                                  "Att6","Att7","Att8", "anchor", "pm")]
+
+p <- dual.resp.with.anc
+
+########### IF Anchor = 1 OR 2 ##################
+
+design12 <- as.data.frame(setNames(replicate(length(p),numeric(0), simplify = F),colnames(p)))
+
+counter1 <- 1
+for(i in 1:dim(p)[1]){
+  design12[counter1, ] <- p[i, ]
+  counter1 <- counter1 + 1
+  L2 <- which(p$concept[i]==Concept.No & (p$anchor[i]==1 | p$anchor[i]==2) & p$pm[i]=='m')
+  if(length(L2)>0){
+    design12[counter1, ] <- p[i, ]
+    for(k in 0:4){
+      design12[counter1+k, ] <- p[i-3+k,] 
+    }
+    counter1 <- counter1+k
+  }
+}
+
+write.csv(design12,"design12.csv",row.names = F)
+
+
+
+design12$v15 <- ifelse((design12$concept==4 & design12$pm == 'm' & (design12$anchor == 1 | design12$anchor == 2)),1,0)
+
+for(i in 5:dim(design12)[1]){
+  design12$cq[i] <- design12$v15[i] + design12$v15[i-4]
+}
+
+design12.with.5 <- as.data.frame(setNames(replicate(length(design12),numeric(0), simplify = F),colnames(design12)))
+
+u.15 <- c(5,0,0,0,0,0,0,0,0)
+
+counter13 <- 1
+for(i in 1:dim(design12)[1]){
+  design12.with.5[counter13, ] <- design12[i, ]
+  counter13 <- counter13 + 1
+  L15 <- which(design12$ad15[i]==2)
+  if(length(L15)>0){
+    design12.with.5[counter13, ] <- design12[i, ]
+    design12.with.5[counter13, 3:11] <- u.15
+    counter13 <- counter13 + 1
+  }
+}
+
+design12.with.5$v16 <- ifelse((design12.with.5$concept < 5 & design12.with.5$pm == 'm' & (design12.with.5$anchor == 1 | design12.with.5$anchor == 2)),1,0)
+
+for(i in 5:dim(design12.with.5)[1]){
+  design12.with.5$cq1[i] <- design12.with.5$v16[i] + design12.with.5$v16[i-4]
+}
+
+q <- design12.with.5
+
+for(i in 4:11){
+  q[,i] <- ifelse(((design12.with.5[,17] == 2) & (design12.with.5[,i] == -1)),1, design12.with.5[,i])
+}
+
+write.csv(q,"q.csv",row.names = F)
+write.csv(design12.with.5,"design12.with.5.csv",row.names = F)
+
+
+############# IF Anchor = 2 #####################
+
+qt2 <- as.data.frame(setNames(replicate(14,numeric(0), simplify = F),cln))
+
+counter2 <- 1
+for(i in 1:dim(p)[1]){
+  qt2[counter2, ] <- p[i, ]
+  counter2 <- counter2 + 1
+  L3 <- which(p$concept[i]==4 & p$anchor[i]==2 & p$pm[i]=='p')
+  if(length(L3)>0){
+    qt2[counter2, ] <- p[i, ]
+    for(k in 0:4){
+      qt2[counter2+k, ] <- p[i-3+k,] 
+    }
+    counter2 <- counter2+k
+  }
+}
+
+write.csv(qt2,"qt2.csv",row.names = F)
+
+v25 <- 0
+
+v25 <- ifelse((qt2$concept==4 & qt2$pm == 'p' & qt2$anchor == 2),1,0)
+
+qt2$v25 <- v25
+
+cq2 <- 0
+
+for(i in 5:dim(qt2)[1]){
+  cq2[i] <- qt2$v25[i] + qt2$v25[i-4]
+}
+
+qt2$ad25 <- cq2
+
+cln13 <- colnames(qt2)
+
+qt2.with.5 <- as.data.frame(setNames(replicate(16,numeric(0), simplify = F),cln13))
+
+u.15 <- c(5,0,0,0,0,0,0,0,0,0)
+
+counter23 <- 1
+for(i in 1:dim(qt2)[1]){
+  qt2.with.5[counter23, ] <- qt2[i, ]
+  counter23 <- counter23 + 1
+  L15 <- which(qt2$ad25[i]==2)
+  if(length(L15)>0){
+    qt2.with.5[counter23, ] <- qt2[i, ]
+    qt2.with.5[counter23, 3:12] <- u.15
+    counter23 <- counter23 + 1
+  }
+}
+
+
+
+write.csv(qt2.with.5,"qt2.with.5.csv",row.names = F)
+
+
+
+########### IF Anchor = 3 ###############
+
+qt3 <- as.data.frame(setNames(replicate(14,numeric(0), simplify = F),colnames(p)))
+
+u <- c(5,0,0,0,0,0,0,0,0,0)
+
+counter3 <- 1
+for(i in 1:dim(p)[1]){
+  qt3[counter3, ] <- p[i, ]
+  counter3 <- counter3 + 1
+  L1 <- which(p$concept[i]==4 & p$anchor[i]==3)
+  if(length(L1)>0){
+    qt3[counter3, ] <- p[i, ]
+    qt3[counter3, 3:12] <- u
+    counter3 <- counter3 + 1
+  }
+}
+
+
+
+write.csv(qt3,"qt3.csv",row.names = F)
+
+################### Adding response column ############################
+
+response <- 0
+response <- ifelse(dual.resp.s$shown==dual.resp.s$chosen,1,0)
+
+dual.resp <- cbind(dual.resp.s,response)
