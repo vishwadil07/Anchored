@@ -1,5 +1,5 @@
 ############## Note 1: Although we have tried to automate the whhole program, 
-#there are places where following specification have been used:#######
+###there are places where following specification have been used:#######
 
 ########### 1. No. of items = 8
 ########### 2. No. of task per respondent = 6
@@ -9,6 +9,7 @@
 
 rm(list = ls())
 library(reshape)
+library(plyr)
 
 ###################### functions to be used ###############################
 
@@ -35,7 +36,8 @@ shown <- read.csv("shown.csv")
 chosen <- read.csv("chosen.csv")
 
 Task.No <- max(max.diff.design$Set)
-Concept.No <- length(max.diff.design) - 2  # -2 bcoz first row is version and second is set
+Concept.No <- length(max.diff.design) - 2 # -2 bcoz first row is version and second is set
+Attr.No <- max(max.diff.design[,2:length(max.diff.design)])
 
 ################## Splitting best/worst/anchor shown #######################
 
@@ -131,7 +133,6 @@ for(i in 1:dim(scb)[1]){
 
 dual.resp.b <- cbind(scb,mb)
 
-
 sb <- vector("integer", dim(dual.resp.b)[1])
 
 for(i in 1:Concept.No){
@@ -197,29 +198,17 @@ dual.resp.bwa <- rbind(dual.resp.ba,dual.resp.wa)
 
 dual.resp.s <- dual.resp.bwa[order(dual.resp.bwa$s),]
 
-write.csv(dual.resp.s, "dual.resp.s.csv", row.names = F)
-
-##################### Adding task and concept ######################
-
-dual.resp.s$task <- rep(1,dim(dual.resp.s)[1])
-
-for(i in (Concept.No + 1):(2*Task.No*Concept.No)){
-  dual.resp.s$task[i] <- dual.resp.s$task[i-Concept.No] + 1
-}
-
-for(i in (2*Task.No*Concept.No + 1):dim(dual.resp.s)[1]){
-  dual.resp.s$task[i] <- dual.resp.s$task[i-(2*Task.No*Concept.No)]
-}
+##################### Adding Concept ######################
 
 dual.resp.s$concept <- seq(from = 1,to = 4,by = 1)
 
 ################### Renaming #########################################
 
 dual.resp.s <- rename(dual.resp.s,c("1","2","3","4","5","6","7","8"), 
-                    c("Att1","Att2","Att3","Att4","Att5","Att6","Att7","Att8"))
+                      c("Att1","Att2","Att3","Att4","Att5","Att6","Att7","Att8"))
 
-dual.resp.with.anc <- dual.resp.s[c("respid","task","concept","Att1","Att2","Att3","Att4","Att5",
-                                  "Att6","Att7","Att8", "anchor", "pm")]
+dual.resp.with.anc <- dual.resp.s[c("respid","concept","Att1","Att2","Att3","Att4","Att5",
+                                    "Att6","Att7","Att8", "anchor","shown","chosen", "pm")]
 
 p <- dual.resp.with.anc
 
@@ -241,131 +230,101 @@ for(i in 1:dim(p)[1]){
   }
 }
 
-write.csv(design12,"design12.csv",row.names = F)
 
-
-
-design12$v15 <- ifelse((design12$concept==4 & design12$pm == 'm' & (design12$anchor == 1 | design12$anchor == 2)),1,0)
+design12$v1 <- ifelse((design12$concept <= 4 & design12$pm == 'm' & (design12$anchor == 1 | design12$anchor == 2)),1,0)
 
 for(i in 5:dim(design12)[1]){
-  design12$cq[i] <- design12$v15[i] + design12$v15[i-4]
+  design12$v2[i] <- design12$v1[i] + design12$v1[i-4]
 }
 
-design12.with.5 <- as.data.frame(setNames(replicate(length(design12),numeric(0), simplify = F),colnames(design12)))
+design12$v2[which(design12$v2 %in% NA)]<- 0 
+design12$v3 <- ifelse(design12$v2 == 2,1,0)
 
-u.15 <- c(5,0,0,0,0,0,0,0,0)
+############ Creating -1 to 1 #######################
+
+design12.f <- design12
+
+for(i in Concept.No:(3+Attr.No)){
+  design12.f[,i] <- ifelse(((design12.f$v3 == 1) & (design12[,i] == -1)),1, design12[,i])
+}
+
+########### Adding Task ##############
+
+for(i in unique(design12.f$respid)){
+  temp.df <- subset(design12.f,design12.f$respid %in% i)
+  j <- 1
+  k <- 1
+  while(j <= dim(temp.df)[1]){
+    temp.df$task[j] <- k
+    if((j %% 4) == 0){
+      k <- k + 1
+    }
+    design12.f[which(design12.f$respid %in% i), "task"] <- temp.df$task
+    j <- j+1
+  }
+}
+
+
+
+
+for(i in 4:dim(design12.f)[1]){
+  design12.f$v4[i] <- design12.f$v3[i] + design12.f$v3[i-3]
+}
+
+design12.f$v4[which(design12.f$v4 %in% NA)] <- 0 
+
+
+design12.f <- design12.f[c("respid","task","concept","Att1","Att2","Att3","Att4","Att5",
+                           "Att6","Att7","Att8", "anchor", "shown","chosen","pm","v4")]
+
+
+design12.f.5 <- as.data.frame(setNames(replicate(length(design12.f),numeric(0), simplify = F),colnames(design12.f)))
+
+
+v5 <- c(5,0,0,0,0,0,0,0,0)
 
 counter13 <- 1
-for(i in 1:dim(design12)[1]){
-  design12.with.5[counter13, ] <- design12[i, ]
+for(i in 1:dim(design12.f)[1]){
+  design12.f.5[counter13, ] <- design12.f[i, ]
   counter13 <- counter13 + 1
-  L15 <- which(design12$ad15[i]==2)
+  L15 <- which(design12.f$v4[i]==2)
   if(length(L15)>0){
-    design12.with.5[counter13, ] <- design12[i, ]
-    design12.with.5[counter13, 3:11] <- u.15
+    design12.f.5[counter13, ] <- design12.f[i, ]
+    design12.f.5[counter13, 3:(3 + Attr.No)] <- v5
     counter13 <- counter13 + 1
   }
 }
 
-design12.with.5$v16 <- ifelse((design12.with.5$concept < 5 & design12.with.5$pm == 'm' & (design12.with.5$anchor == 1 | design12.with.5$anchor == 2)),1,0)
-
-for(i in 5:dim(design12.with.5)[1]){
-  design12.with.5$cq1[i] <- design12.with.5$v16[i] + design12.with.5$v16[i-4]
-}
-
-q <- design12.with.5
-
-for(i in 4:11){
-  q[,i] <- ifelse(((design12.with.5[,17] == 2) & (design12.with.5[,i] == -1)),1, design12.with.5[,i])
-}
-
-write.csv(q,"q.csv",row.names = F)
-write.csv(design12.with.5,"design12.with.5.csv",row.names = F)
-
-
-############# IF Anchor = 2 #####################
-
-qt2 <- as.data.frame(setNames(replicate(14,numeric(0), simplify = F),cln))
-
-counter2 <- 1
-for(i in 1:dim(p)[1]){
-  qt2[counter2, ] <- p[i, ]
-  counter2 <- counter2 + 1
-  L3 <- which(p$concept[i]==4 & p$anchor[i]==2 & p$pm[i]=='p')
-  if(length(L3)>0){
-    qt2[counter2, ] <- p[i, ]
-    for(k in 0:4){
-      qt2[counter2+k, ] <- p[i-3+k,] 
-    }
-    counter2 <- counter2+k
-  }
-}
-
-write.csv(qt2,"qt2.csv",row.names = F)
-
-v25 <- 0
-
-v25 <- ifelse((qt2$concept==4 & qt2$pm == 'p' & qt2$anchor == 2),1,0)
-
-qt2$v25 <- v25
-
-cq2 <- 0
-
-for(i in 5:dim(qt2)[1]){
-  cq2[i] <- qt2$v25[i] + qt2$v25[i-4]
-}
-
-qt2$ad25 <- cq2
-
-cln13 <- colnames(qt2)
-
-qt2.with.5 <- as.data.frame(setNames(replicate(16,numeric(0), simplify = F),cln13))
-
-u.15 <- c(5,0,0,0,0,0,0,0,0,0)
-
-counter23 <- 1
-for(i in 1:dim(qt2)[1]){
-  qt2.with.5[counter23, ] <- qt2[i, ]
-  counter23 <- counter23 + 1
-  L15 <- which(qt2$ad25[i]==2)
-  if(length(L15)>0){
-    qt2.with.5[counter23, ] <- qt2[i, ]
-    qt2.with.5[counter23, 3:12] <- u.15
-    counter23 <- counter23 + 1
-  }
-}
-
-
-
-write.csv(qt2.with.5,"qt2.with.5.csv",row.names = F)
-
-
 
 ########### IF Anchor = 3 ###############
 
-qt3 <- as.data.frame(setNames(replicate(14,numeric(0), simplify = F),colnames(p)))
+design3 <- as.data.frame(setNames(replicate(length(design12.f.5),numeric(0), simplify = F),colnames(design12.f.5)))
 
-u <- c(5,0,0,0,0,0,0,0,0,0)
+v6 <- c(5,0,0,0,0,0,0,0,0)
 
 counter3 <- 1
-for(i in 1:dim(p)[1]){
-  qt3[counter3, ] <- p[i, ]
+for(i in 1:dim(design12.f.5)[1]){
+  design3[counter3, ] <- design12.f.5[i, ]
   counter3 <- counter3 + 1
-  L1 <- which(p$concept[i]==4 & p$anchor[i]==3)
+  L1 <- which(design12.f.5$concept[i]==4 & design12.f.5$anchor[i]==3)
   if(length(L1)>0){
-    qt3[counter3, ] <- p[i, ]
-    qt3[counter3, 3:12] <- u
+    design3[counter3, ] <- design12.f.5[i, ]
+    design3[counter3, 3:(3 + Attr.No)] <- v6
     counter3 <- counter3 + 1
   }
 }
 
-
-
-write.csv(qt3,"qt3.csv",row.names = F)
+write.csv(design3,"design3.csv",row.names = F)
 
 ################### Adding response column ############################
 
-response <- 0
-response <- ifelse(dual.resp.s$shown==dual.resp.s$chosen,1,0)
+design.final <- design3
 
-dual.resp <- cbind(dual.resp.s,response)
+design.final$response <- ifelse((design.final$shown==design.final$chosen) | 
+                                  ((design.final$anchor == 3) & (design.final$concept == 5)),1,0)
+
+design.final <- design.final[c("respid","task","concept","Att1","Att2","Att3","Att4","Att5",
+                               "Att6","Att7","Att8", "response")]
+
+write.csv(design.final,"design.final.csv",row.names = F)
+
